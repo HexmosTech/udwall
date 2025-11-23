@@ -156,23 +156,38 @@ def load_rules_from_file():
     """
     Reads and parses the 'udwall.conf' file to load firewall rules.
 
-    This function locates 'udwall.conf' in the current directory, reads its
-    content, and uses `exec()` to interpret it as Python code. It expects the
-    file to define a single variable, `rules`, which should be a list of rule
-    dictionaries.
+    This function searches for 'udwall.conf' in the following order:
+    1. Current Working Directory
+    2. The directory where this script is located
+    3. /etc/udwall/udwall.conf
+
+    It expects the file to define a single variable, `rules`, which should be a
+    list of rule dictionaries.
 
     If the file is not found or a parsing error occurs, the script will print
     an error message and exit.
 
     Returns:
-        list: The list of rule dictionaries loaded from the configuration file.
+    list: The list of rule dictionaries loaded from the configuration file.
     """
-    file_path = 'udwall.conf'
-    if not os.path.exists(file_path):
+    possible_paths = [
+        os.path.join(os.getcwd(), 'udwall.conf'),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'udwall.conf'),
+        '/etc/udwall/udwall.conf'
+    ]
+
+    file_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            file_path = path
+            break
+
+    if not file_path:
         script_name = os.path.basename(sys.argv[0])
         # Use print to stderr for this specific, user-facing error message
-        print(f"❌ ERROR: {file_path} not found.", file=sys.stderr)
-        print(f"ℹ️  INFO: You can create one from your current UFW rules by running `sudo python3 {script_name} --create`", file=sys.stderr)
+        print(f"❌ ERROR: udwall.conf not found.", file=sys.stderr)
+        print(f"Searched in: {', '.join(possible_paths)}", file=sys.stderr)
+        print(f"ℹ️  INFO: You can create one from your current UFW rules by running `sudo {script_name} --create`", file=sys.stderr)
         sys.exit(1)
 
     try:
