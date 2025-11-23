@@ -79,8 +79,14 @@ Currently `udwall` supports the following rule patterns:
 5.  **Rule Deletion**: Setting `isEnabled: false` will automatically generate the corresponding `delete` command for any of the above patterns.
 
 
+
+### Steps to Enable `udwall`
+
+Follow these simple steps to configure and activate `udwall` on your system. This process ensures your current firewall state is captured and safely managed going forward.
+
 > **Note:** `udwall` requires `sudo` privileges.
-### Create a Configuration
+
+#### Step 1: Create a Configuration
 
 You can create a configuration file manually or use the `--create` command to generate one from your current live UFW rules.
 
@@ -89,7 +95,7 @@ sudo udwall --create
 ```
 This creates a `udwall.conf` file in `/etc/udwall/udwall.conf`.
 
-### Create Backup
+#### Step 2: Create Backup
 
 You can create a backup of your current UFW rules with the `--backup` command.
 
@@ -99,7 +105,7 @@ sudo udwall --backup
 
 This creates a timestamped backup in `/home/ubuntu/backup/firewall-backup/`, containing both iptables and UFW rules.
 
-### Define Rules
+#### Step 3: Define Rules
 
 Edit the configuration file at `/etc/udwall/udwall.conf`.
 
@@ -122,7 +128,7 @@ rules = [
 ```
 
 
-### Apply the Configuration
+#### Step 4: Apply the Configuration
 
 This will back up your current state, remove undefined rules, and apply the new ones based on the configuration file.
 
@@ -131,7 +137,7 @@ sudo udwall --apply
 ```
 Backups are stored in `/home/ubuntu/backup/firewall-backup/`.
 
-### Enable Firewall
+#### Step 5: Enable Firewall
 
 This sets up the `iptables` rules required to make Docker respect UFW.
 
