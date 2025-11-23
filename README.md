@@ -1,4 +1,4 @@
-# `udwall`: Make UFW docker-compatible with a single command
+# `udwall`: A Single-Command Tool to Make UFW Docker-Compatible
 
 `udwall` is a declarative tool to manage UFW and Docker firewall rules using a single Python configuration file. It fixes the Docker security flaw where containers bypass UFW, and it automates rule management so you never have to run manual `ufw allow` commands again.
 
