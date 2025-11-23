@@ -120,4 +120,4 @@ The core `iptables` logic to fix the Docker/UFW security flaw is based on the wo
 
 ## 📄 License
 
-MIT
+[MIT](LICENSE)
