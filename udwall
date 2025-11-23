@@ -9,6 +9,8 @@ import shlex
 import re
 import logging
 
+__version__ = "0.0.2"
+
 AFTER_RULES_PATH = "/etc/ufw/after.rules"
 AFTER6_RULES_PATH = "/etc/ufw/after6.rules"
 
@@ -1244,6 +1246,12 @@ def main():
         prog="udwall",
         description="udwall: Declarative UFW + Docker firewall management.",
         formatter_class=argparse.RawTextHelpFormatter
+    )
+    
+    parser.add_argument(
+        '-v', '--version',
+        action='version',
+        version=f'%(prog)s {__version__}'
     )
     
     group = parser.add_mutually_exclusive_group()
