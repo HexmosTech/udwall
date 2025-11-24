@@ -177,6 +177,25 @@ sudo udwall --disable
 
 The core `iptables` logic to fix the Docker/UFW security flaw is based on the work by [chaifeng/ufw-docker](https://github.com/chaifeng/ufw-docker). `udwall` extends this by adding declarative state management.
 
+
+---
+
+## Related Projects
+
+**[LiveReview](https://hexmos.com/livereview)** - I'm building a private AI code review tool that runs on your LLM key (OpenAI, Gemini, etc.) with flat, no-seat pricing — designed for small teams. Check it out, if that's your kind of thing.
+
+LiveReview helps you get great feedback on your PR/MR in a few minutes.
+
+Saves hours on every PR by giving fast, automated first-pass reviews. Helps both junior/senior engineers to go faster.
+
+If you're tired of waiting for your peer to review your code or are not confident that they'll provide valid feedback, here's LiveReview for you.
+
+## ⭐ Star This Repository
+
+If you find these tools helpful, please consider giving us a ⭐ star on GitHub! It helps us reach more developers who could benefit from these utilities.
+
+---
+
 ## 📄 License
 
 [MIT](LICENSE)

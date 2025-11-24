@@ -8,6 +8,7 @@ import shutil
 import shlex 
 import re
 import logging
+import pwd
 
 __version__ = "0.0.4"
 
@@ -727,16 +728,34 @@ def backup_helper():
     try:
         # Format: 2025-11-05_20-30-00
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
-        main_backup_dir = "/home/ubuntu/backup/firewall-backup"
+        
+        # 1. System-wide backup
+        main_backup_dir = "/backup"
         backup_path = os.path.join(main_backup_dir, timestamp)
 
-        ufw_backup_path = os.path.join(backup_path, "ufw")
-        iptables_backup_path = os.path.join(backup_path, "iptable")
+        # 2. User-local backup
+        user_backup_path = None
+        sudo_user = os.environ.get('SUDO_USER')
+        if sudo_user:
+            try:
+                user_home = pwd.getpwnam(sudo_user).pw_dir
+                user_backup_dir = os.path.join(user_home, ".udwall", "backups")
+                user_backup_path = os.path.join(user_backup_dir, timestamp)
+            except KeyError:
+                logging.warning(f"Could not determine home directory for user {sudo_user}. Skipping user-local backup.")
+        
+        backup_paths = [backup_path]
+        if user_backup_path:
+            backup_paths.append(user_backup_path)
 
-        # Create all directories
-        # We need root, which is already checked in main()
-        os.makedirs(ufw_backup_path, exist_ok=True)
-        os.makedirs(iptables_backup_path, exist_ok=True)
+        for path in backup_paths:
+            ufw_backup_path = os.path.join(path, "ufw")
+            iptables_backup_path = os.path.join(path, "iptable")
+
+            # Create all directories
+            # We need root, which is already checked in main()
+            os.makedirs(ufw_backup_path, exist_ok=True)
+            os.makedirs(iptables_backup_path, exist_ok=True)
 
     except PermissionError:
         logging.critical(f"Permission denied. Cannot create backup directory at {main_backup_dir}.")
@@ -748,74 +767,80 @@ def backup_helper():
 
     all_successful = True
 
-    # --- 2. Backup UFW ---
-    logging.info(f"\nBacking up UFW configs to {ufw_backup_path}...")
-    try:
-        # Copy the main /etc/ufw/ directory
-        shutil.copytree('/etc/ufw', os.path.join(ufw_backup_path, 'ufw_config_dir'))
-        # Copy the /etc/default/ufw file
-        shutil.copy('/etc/default/ufw', ufw_backup_path)
-        logging.info("UFW backup successful.")
-    except FileNotFoundError:
-        logging.warning("UFW config files not found. Skipping UFW backup.")
-        all_successful = False
-    except Exception as e:
-        logging.error(f"Error backing up UFW: {e}")
-        all_successful = False
+    for path in backup_paths:
+        ufw_backup_path = os.path.join(path, "ufw")
+        iptables_backup_path = os.path.join(path, "iptable")
 
-    # --- 3. Backup iptables (IPv4) ---
-    logging.info(f"\nBacking up iptables (IPv4) rules to {iptables_backup_path}...")
-    iptables_save_file = os.path.join(iptables_backup_path, "iptables.rules")
-    try:
-        # We run 'iptables-save' (no sudo needed, main() checks root)
-        # and write its stdout directly to the file
-        with open(iptables_save_file, 'w') as f:
-            subprocess.run(
-                ['iptables-save'],
-                stdout=f,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True
-            )
-        logging.info("iptables (IPv4) backup successful.")
-    except FileNotFoundError:
-        logging.warning("'iptables-save' command not found. Skipping IPv4 backup.")
-        all_successful = False
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Error running 'iptables-save': {e.stderr}")
-        all_successful = False
-    except Exception as e:
-        logging.error(f"Error backing up iptables (IPv4): {e}")
-        all_successful = False
+        # --- 2. Backup UFW ---
+        logging.info(f"\nBacking up UFW configs to {ufw_backup_path}...")
+        try:
+            # Copy the main /etc/ufw/ directory
+            shutil.copytree('/etc/ufw', os.path.join(ufw_backup_path, 'ufw_config_dir'))
+            # Copy the /etc/default/ufw file
+            shutil.copy('/etc/default/ufw', ufw_backup_path)
+            logging.info("UFW backup successful.")
+        except FileNotFoundError:
+            logging.warning("UFW config files not found. Skipping UFW backup.")
+            all_successful = False
+        except Exception as e:
+            logging.error(f"Error backing up UFW: {e}")
+            all_successful = False
 
-    # --- 4. Backup ip6tables (IPv6) ---
-    logging.info(f"\nBacking up ip6tables (IPv6) rules to {iptables_backup_path}...")
-    ip6tables_save_file = os.path.join(iptables_backup_path, "ip6tables.rules")
-    try:
-        with open(ip6tables_save_file, 'w') as f:
-            subprocess.run(
-                ['ip6tables-save'],
-                stdout=f,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True
-            )
-        logging.info("ip6tables (IPv6) backup successful.")
-    except FileNotFoundError:
-        logging.info("'ip6tables-save' command not found. Skipping IPv6 backup.")
-        # We don't set all_successful to False, as IPv6 might be disabled
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Error running 'ip6tables-save': {e.stderr}")
-        all_successful = False
-    except Exception as e:
-        logging.error(f"Error backing up ip6tables (IPv6): {e}")
-        all_successful = False
+        # --- 3. Backup iptables (IPv4) ---
+        logging.info(f"\nBacking up iptables (IPv4) rules to {iptables_backup_path}...")
+        iptables_save_file = os.path.join(iptables_backup_path, "iptables.rules")
+        try:
+            # We run 'iptables-save' (no sudo needed, main() checks root)
+            # and write its stdout directly to the file
+            with open(iptables_save_file, 'w') as f:
+                subprocess.run(
+                    ['iptables-save'],
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True
+                )
+            logging.info("iptables (IPv4) backup successful.")
+        except FileNotFoundError:
+            logging.warning("'iptables-save' command not found. Skipping IPv4 backup.")
+            all_successful = False
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error running 'iptables-save': {e.stderr}")
+            all_successful = False
+        except Exception as e:
+            logging.error(f"Error backing up iptables (IPv4): {e}")
+            all_successful = False
+
+        # --- 4. Backup ip6tables (IPv6) ---
+        logging.info(f"\nBacking up ip6tables (IPv6) rules to {iptables_backup_path}...")
+        ip6tables_save_file = os.path.join(iptables_backup_path, "ip6tables.rules")
+        try:
+            with open(ip6tables_save_file, 'w') as f:
+                subprocess.run(
+                    ['ip6tables-save'],
+                    stdout=f,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=True
+                )
+            logging.info("ip6tables (IPv6) backup successful.")
+        except FileNotFoundError:
+            logging.info("'ip6tables-save' command not found. Skipping IPv6 backup.")
+            # We don't set all_successful to False, as IPv6 might be disabled
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Error running 'ip6tables-save': {e.stderr}")
+            all_successful = False
+        except Exception as e:
+            logging.error(f"Error backing up ip6tables (IPv6): {e}")
+            all_successful = False
 
     # --- 5. Final Report ---
     if all_successful:
-        logging.info(f"\nBackup complete: {backup_path}")
+        logging.info(f"\nBackup complete: {main_backup_dir}")
+        if user_backup_path:
+             logging.info(f"User backup complete: {user_backup_path}")
     else:
-        logging.warning(f"\nBackup process completed with errors: {backup_path}")
+        logging.warning(f"\nBackup process completed with errors.")
 
 
     return all_successful
