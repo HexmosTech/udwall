@@ -1222,8 +1222,8 @@ def create_config_from_ufw():
     logging.info("Merging parsed rules with built-in default safety rules...")
     
     # Enforce global configuration path
-    config_dir = '/etc/udwall'
-    file_path = os.path.join(config_dir, 'udwall.conf')
+    config_dir = os.path.dirname(UDWALL_SYSTEM_CONF_PATH)
+    file_path = UDWALL_SYSTEM_CONF_PATH
     
     # Ensure directory exists
     if not os.path.exists(config_dir):
