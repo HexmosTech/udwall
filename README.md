@@ -133,6 +133,70 @@ rules = [
 ]
 ```
 
+#### Config Schema
+
+udwall has 5 config options:
+
+1. `from`: The source IP address or `any`.
+2. `connectionType`: The protocol type (e.g., `tcp`, `udp`).
+3. `to`: The destination port or service name.
+4. `isDockerServed`: Whether the rule is for a Docker container.
+5. `isEnabled`: Whether the rule is enabled. 
+
+
+#### Example: Docker Container Port
+
+If you are running a Docker container that exposes a port (e.g., port 4050), here's how to handle it with `udwall`.
+
+**Docker Compose Example:**
+
+```yaml
+version: '3.8'
+
+services:
+  web:
+    # We've removed the 'build: .' line.
+    # Now, Docker will pull the 'python:3.9-slim' image from Docker Hub.
+    image: python:3.6
+    
+    # Set the working directory inside the container
+    working_dir: /app
+    
+    ports:
+      # This now maps a DYNAMIC (random) host port 
+      # to container port 4050.
+    - "4050"
+      
+    volumes:
+      # Mount the current directory (containing app.py and requirements.txt)
+      # to /app in the container.
+      - .:/app
+      
+    # This command runs when the container starts.
+    # 1. It installs the packages from requirements.txt.
+    # 2. It starts the Flask application (app.py).
+    command: sh -c "pip install -r requirements.txt && python app2.py"
+```
+
+**udwall Configuration to Allow Access:**
+
+If you want to open port 4050 to any user, add this rule to `/etc/udwall/udwall.conf`:
+
+```python
+rules = [
+    # Remaing Default rules
+    # Allow access to Docker container on port 4050 from any IP
+    {'from': 'any', 'connectionType': 'tcp', 'to': 4050, 'isDockerServed': True, 'isEnabled': True},
+]
+```
+
+Then apply the configuration:
+
+```bash
+sudo udwall --apply
+```
+
+
 
 #### Step 4: Apply the Configuration
 
