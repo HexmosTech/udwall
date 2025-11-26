@@ -227,13 +227,13 @@ sudo udwall --disable
 
 | Command | Description |
 | :--- | :--- |
-| `sudo udwall --enable` | **Initialize**: Sets up the Docker-UFW integration and enables UFW. Run this first. |
-| `sudo udwall --apply` | **Apply Rules**: Reads `udwall.conf`, backs up current state, and applies the new firewall rules. |
 | `sudo udwall --dry-run` | **Preview**: Shows exactly which `ufw` commands would be run, without making any changes. |
 | `sudo udwall --create` | **Import**: Generates a `udwall.conf` file at `/etc/udwall/udwall.conf` based on your *current* active UFW rules. |
 | `sudo udwall --backup` | **Backup**: Manually creates a timestamped backup of `/etc/ufw` and `iptables` rules in `~/.udwall/backups/`. |
 | `sudo udwall --status` | **Check Status**: Displays the current UFW status and active rules (numbered). |
 | `sudo udwall --disable` | **Uninstall**: Removes the Docker-UFW integration, deletes custom chains, and disables UFW. |
+| `sudo udwall --enable -f` | **Initialize**: Sets up the Docker-UFW integration and enables UFW. Run this first. Use `-f` to skip SSH check. |
+| `sudo udwall --apply -f` | **Apply Rules**: Reads `udwall.conf`, backs up current state, and applies the new firewall rules. Use `-f` to skip safety checks. |
 | `sudo udwall --version` | **Version**: Displays the installed version of `udwall`. |
 | `sudo udwall --help` | **Help**: Shows the help message and available options. |
 
