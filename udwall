@@ -10,7 +10,7 @@ import re
 import logging
 import pwd
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 UDWALL_CONF_FILE = "udwall.conf"
 UDWALL_SYSTEM_CONF_PATH = "/etc/udwall/udwall.conf"
