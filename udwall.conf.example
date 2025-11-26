@@ -1,7 +1,3 @@
 rules = [
-    {'from': 'any', 'connectionType': 'udp', 'to': '60000:61000', 'isDockerServed': False, 'isEnabled': True},
-    {'from': 'any', 'connectionType': 'tcp', 'to': 'OpenSSH', 'isDockerServed': False, 'isEnabled': True},
-    {'from': 'any', 'connectionType': 'tcp', 'to': 80, 'isDockerServed': False, 'isEnabled': True},
-    {'from': 'any', 'connectionType': 'tcp', 'to': 443, 'isDockerServed': False, 'isEnabled': True},
     {'from': 'any', 'connectionType': 'tcp', 'to': 22, 'isDockerServed': False, 'isEnabled': True},
 ]

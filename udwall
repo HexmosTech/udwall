@@ -24,6 +24,7 @@ IPTABLES_SAVE_CMD = "iptables-save"
 IP6TABLES_SAVE_CMD = "ip6tables-save"
 UFW_CMD = "ufw"
 DPKG_CMD = "dpkg"
+ALLOW_SSH_CMD = ["sudo", UFW_CMD, "allow", "ssh"]
 
 AFTER_RULES_PATH = os.path.join(UFW_CONFIG_DIR, "after.rules")
 AFTER6_RULES_PATH = os.path.join(UFW_CONFIG_DIR, "after6.rules")
@@ -241,7 +242,7 @@ def reload_ufw():
 # --- UTILITY & HELPER FUNCTIONS ---
 
 
-def enable_ufw():
+def enable_ufw(force=False):
     """
     Ensures UFW is properly enabled and configured for basic access.
 
@@ -250,6 +251,9 @@ def enable_ufw():
     2.  Idempotently adds an 'allow ssh' rule to prevent accidental lockouts.
     3.  If UFW is found to be inactive, it executes `sudo ufw enable`, which
         will prompt the user for confirmation via the console.
+
+    Args:
+        force (bool): If True, prompts the user to skip the SSH rule check.
 
     The script will exit if any of these steps fail, as a functioning UFW
     is critical for subsequent operations.
@@ -266,10 +270,18 @@ def enable_ufw():
         )
         
         # --- 2. Allow SSH (Ensures rule exists) ---
-        allow_ssh_command = ['sudo', UFW_CMD, 'allow', 'ssh']
-        logging.info(f"Ensuring SSH rule exists: {' '.join(allow_ssh_command)}")
-        subprocess.run(allow_ssh_command, check=True)
-        logging.info("Successfully ensured 'allow ssh' rule.")
+        skip_ssh = False
+        if force:
+            print("Force mode enabled. Do you want to skip ensuring 'allow ssh' rule? [y/N] ", end="", flush=True)
+            choice = input().strip().lower()
+            if choice == 'y':
+                skip_ssh = True
+                logging.info("Skipping SSH rule check as requested.")
+
+        if not skip_ssh:
+            logging.info(f"Ensuring SSH rule exists: {' '.join(ALLOW_SSH_CMD)}")
+            subprocess.run(ALLOW_SSH_CMD, check=True)
+            logging.info("Successfully ensured 'allow ssh' rule.")
 
         # --- 3. Enable UFW if needed ---
         if "Status: inactive" in result.stdout:
@@ -880,7 +892,7 @@ def backup():
     return backup_helper()
     
 
-def enable():
+def enable(force=False):
     """
     Ensures the Docker UFW fix is applied and that UFW is enabled.
 
@@ -913,7 +925,7 @@ def enable():
         sys.exit(1)
 
     # Step 2: Enable UFW
-    ufw_enabled_ok = enable_ufw()
+    ufw_enabled_ok = enable_ufw(force=force)
     summary["ufw_enabled"] = ufw_enabled_ok
     if not ufw_enabled_ok:
         logging.critical("\n!!! Failed to enable UFW. Aborting !!!")
@@ -945,7 +957,7 @@ def enable():
     logging.info("\n--- Enable process complete. ---")
 
 
-def apply_rules():
+def apply_rules(force=False):
     """
     Atomically resets and applies the firewall configuration from `udwall.conf`.
 
@@ -958,6 +970,10 @@ def apply_rules():
         index-shifting errors during deletion.
     4.  Calls the `add_rules()` function to apply the new configuration from
         `udwall.conf`.
+    
+    Args:
+        force (bool): If True, skips safety checks (REQUIRED_RULES, PROTECTED_RULES)
+                      and prompts for user confirmation.
     """
     logging.info("--- Starting atomic apply operation ---")
 
@@ -975,14 +991,61 @@ def apply_rules():
 
 
     # Convert lists of dicts to sets of tuples for easy comparison
-    loaded_rules_set = {tuple(sorted(d.items())) for d in REQUIRED_RULES}
+    loaded_rules_set = {tuple(sorted(d.items())) for d in loaded_rules}
     
-    for rule in REQUIRED_RULES:
-        if tuple(sorted(rule.items())) not in loaded_rules_set:
-            logging.error(f"CRITICAL: udwall.conf is missing a required safety rule:  {rule}")
+    # --- Safety Checks ---
+    if not force:
+        # 1. Check for REQUIRED_RULES (exact match)
+        required_rules_set = {tuple(sorted(d.items())) for d in REQUIRED_RULES}
+        missing_rules = []
+        for rule in REQUIRED_RULES:
+            if tuple(sorted(rule.items())) not in loaded_rules_set:
+                missing_rules.append(rule)
+        
+        if missing_rules:
+            logging.error(f"CRITICAL: udwall.conf is missing required safety rules: {missing_rules}")
             logging.error("Aborting apply operation to prevent potential lockout.")
+            logging.info("To bypass this check and apply anyway, use: --apply -f")
             sys.exit(1)
-    logging.info("Success: udwall.conf contains all required safety rules.")
+
+        # 2. Check for SSH port 22 explicitly (common lockout cause)
+        # We look for any rule that allows tcp on port 22
+        ssh_found = False
+        for rule in loaded_rules:
+            if str(rule.get('to')) == '22' and rule.get('connectionType') == 'tcp' and rule.get('isEnabled'):
+                ssh_found = True
+                break
+        
+        if not ssh_found:
+             logging.error("CRITICAL: No rule found allowing SSH (port 22/tcp).")
+             logging.error("Applying this configuration could lock you out of the server.")
+             logging.info("To bypass this check and apply anyway, use: --apply -f")
+             sys.exit(1)
+
+        logging.info("Success: udwall.conf contains all required safety rules.")
+
+    else:
+        # --- Force Mode Confirmation ---
+        logging.warning("!!! FORCE MODE ENABLED !!!")
+        logging.warning("Skipping safety checks for REQUIRED_RULES and PROTECTED_RULES.")
+        logging.warning("This may result in a lockout if SSH rules are missing.")
+        
+        # Check if 22/tcp is in the new rules to give a specific warning
+        ssh_found = False
+        for rule in loaded_rules:
+            if str(rule.get('to')) == '22' and rule.get('connectionType') == 'tcp' and rule.get('isEnabled'):
+                ssh_found = True
+                break
+        
+        if not ssh_found:
+            logging.warning("WARNING: Your new configuration does NOT appear to allow SSH (port 22/tcp).")
+            logging.warning("You WILL likely lose access to this server.")
+
+        print("Are you sure you want to proceed? [Y/n] ", end="", flush=True)
+        choice = input().strip().lower()
+        if choice != 'y':
+            logging.info("Aborted by user.")
+            sys.exit(0)
 
     check_ufw_installed()
 
@@ -991,7 +1054,13 @@ def apply_rules():
     summary["backup_created"] = backup()
 
     # --- 1. Define protected rules that should not be deleted ---
-    logging.info(f"Protected rules (will not be deleted): {', '.join(PROTECTED_RULES)}")
+    # In force mode, we do NOT protect any rules. We wipe everything not in the config.
+    current_protected_rules = [] if force else PROTECTED_RULES
+    
+    if current_protected_rules:
+        logging.info(f"Protected rules (will not be deleted): {', '.join(current_protected_rules)}")
+    else:
+        logging.info("No protected rules. All existing rules will be removed.")
 
     # --- 2. Get all current numbered rules ---
     try:
@@ -1021,7 +1090,7 @@ def apply_rules():
             rule_def_check = rule_def.replace("(v6)", "").strip()
 
             # Check if the normalized definition is in our protected list
-            if rule_def_check not in PROTECTED_RULES:
+            if rule_def_check not in current_protected_rules:
                 # Optional: print what is being marked for deletion for debugging
                 # print(f"Marking for deletion: [{rule_num}] {rule_def}")
                 rules_to_delete.append(rule_num)
@@ -1286,6 +1355,8 @@ def main():
     group.add_argument("--apply", action="store_true", help="Atomically remove old rules and apply the new configuration.")
     group.add_argument("--status", action="store_true", help="Show the current UFW status, including numbered rules.")
 
+    parser.add_argument("-f", "--force", action="store_true", help="Force apply/enable, skipping safety checks.")
+
     args = parser.parse_args()
 
     # If no arguments are provided, print help and exit.
@@ -1300,11 +1371,11 @@ def main():
     elif args.dry_run:
         dry_run_rules()
     elif args.enable:
-        enable()
+        enable(force=args.force)
     elif args.create:
         create_config_from_ufw()
     elif args.apply:
-        apply_rules()
+        apply_rules(force=args.force)
     elif args.status:
         show_status()
     else:
