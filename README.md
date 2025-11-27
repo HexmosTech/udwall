@@ -143,6 +143,17 @@ udwall has 5 config options:
 4. `isDockerServed`: Whether the rule is for a Docker container.
 5. `isEnabled`: Whether the rule is enabled.
 
+#### Example: Non Docker Port
+
+If you are running simple python server on port 4050, here's how to handle it with `udwall`.
+
+```python
+rules = [
+    # Allow access to Docker container on port 4050 from any IP
+    {'from': 'any', 'connectionType': 'tcp', 'to': 4050, 'isDockerServed': False, 'isEnabled': True},
+]
+```
+
 #### Example: Docker Container Port
 
 If you are running a Docker container that exposes a port (e.g., port 4050), here's how to handle it with `udwall`.
@@ -151,26 +162,21 @@ If you are running a Docker container that exposes a port (e.g., port 4050), her
 
 ```yaml
 version: '3.8'
-
 services:
   web:
     # We've removed the 'build: .' line.
     # Now, Docker will pull the 'python:3.9-slim' image from Docker Hub.
     image: python:3.6
-
     # Set the working directory inside the container
     working_dir: /app
-
     ports:
       # This now maps a DYNAMIC (random) host port
       # to container port 4050.
     - "4050"
-
     volumes:
       # Mount the current directory (containing app.py and requirements.txt)
       # to /app in the container.
       - .:/app
-
     # This command runs when the container starts.
     # 1. It installs the packages from requirements.txt.
     # 2. It starts the Flask application (app.py).
@@ -189,11 +195,6 @@ rules = [
 ]
 ```
 
-Then apply the configuration:
-
-```bash
-sudo udwall --apply
-```
 
 #### Step 4: Apply the Configuration
 
