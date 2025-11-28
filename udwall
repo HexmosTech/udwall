@@ -391,6 +391,7 @@ def generate_ufw_command(rule):
             'isDockerServed' (bool): True if it's a Docker 'route' rule.
             'isEnabled' (bool): True to generate an 'allow' command, False
                                 for a 'delete allow' command.
+            'dip' (str, optional): The Docker container IP address.
     Returns:
         str: The fully formed `sudo ufw` command string.
     """
@@ -399,12 +400,14 @@ def generate_ufw_command(rule):
     port = rule.get("to")
     is_docker = rule.get("isDockerServed")
     is_enabled = rule.get("isEnabled")
+    dip = rule.get("dip") or rule.get("dIp") # Support both casing
     
     action = "allow" if is_enabled else "delete allow"
 
     cmd = ""
     if is_docker:
-        cmd = f"{UFW_CMD} route {action} from {src} to any port {port} proto {proto}"
+        dest_ip = dip if dip else "any"
+        cmd = f"{UFW_CMD} route {action} from {src} to {dest_ip} port {port} proto {proto}"
     else:
         if src.lower() == "any":
             # Correctly format the port/protocol part
