@@ -142,6 +142,7 @@ udwall has 5 config options:
 3. `to`: The destination port or service name.
 4. `isDockerServed`: Whether the rule is for a Docker container.
 5. `isEnabled`: Whether the rule is enabled.
+6. `dip`: (Optional) The Docker container IP address. Useful for targeting specific containers.
 
 #### Example: Non Docker Port
 
@@ -192,7 +193,12 @@ rules = [
     # Remaining Default rules
     # Allow access to Docker container on port 4050 from any IP
     {'from': 'any', 'connectionType': 'tcp', 'to': 4050, 'isDockerServed': True, 'isEnabled': True},
+
+    # Allow access to a SPECIFIC Docker container IP (e.g. 172.17.0.2)
+    # You can find this IP using `sudo udwall --dip`
+    {'from': 'any', 'connectionType': 'tcp', 'to': 4050, 'isDockerServed': True, 'isEnabled': True, 'dip': '172.17.0.2'},
 ]
+
 ```
 
 #### Step 4: Apply the Configuration
@@ -244,6 +250,70 @@ This enables the firewall without ssh port checks.
 sudo udwall --enable -f
 ```
 
+### How To specify Specific Docker Container IP
+
+If you have multiple docker container running on same port and you want to allow access to specific container then you can use this feature.
+
+By default `udwall` will allow access to all docker container running on same port.
+
+For example:
+
+let assume we have two docker container running on port 5000.
+
+```
+CONTAINER ID   IMAGE                     COMMAND                  CREATED         STATUS         PORTS                                         NAMES
+19d49f401a91   simple-flask-app:latest   "python app.py"          3 minutes ago   Up 2 minutes   0.0.0.0:5000->5000/tcp, [::]:5000->5000/tcp   keen_wilson
+ccd3436070b4   python:3.6                "sh -c 'pip install …"   6 minutes ago   Up 6 minutes   0.0.0.0:5001->5000/tcp, [::]:5001->5000/tcp   simple-python-flask-dockerized-application-web-1
+```
+
+If we use this config
+
+```python
+rules=[
+    {'from': 'any', 'connectionType': 'tcp', 'to': 5000, 'isDockerServed': True, 'isEnabled': True},
+]
+```
+
+`udwall` will allow access to all docker container running on port `5000`.
+
+That means both `http://<ip>:5000` and`http://<ip>:5001` will be open to any ip.
+
+To allow access to specific docker container you can use this feature.
+
+#### Step 1: Find docker ip address
+
+By running this command you can find docker ip address
+
+```
+sudo udwall --dip
+```
+
+Output:
+
+```
+--- Finding Docker IPs ---
+IP              | External Port   | Internal Port   | Container Name
+----------------------------------------------------------------------
+172.17.0.2      | 5000            | 5000            | keen_wilson
+172.17.0.2      | 5000            | 5000            | keen_wilson
+172.18.0.2      | 5001            | 5000            | simple-python-flask-dockerized-application-web-1
+172.18.0.2      | 5001            | 5000            | simple-python-flask-dockerized-application-web-1
+```
+
+#### Step 2 : Add the rules like this
+
+```python
+rules=[{'from': 'any', 'connectionType': 'tcp', 'to': 5000, 'dip': '172.17.0.2', 'isDockerServed': True, 'isEnabled': True},]
+```
+
+
+#### Expectation
+
+Only  `http://<ip>:5000` will be open to any ip.
+
+`http://<ip>:5001` will be closed to any ip.
+
+
 ### Commands
 
 | Command | Description |
@@ -252,6 +322,7 @@ sudo udwall --enable -f
 | `sudo udwall --create` | **Import**: Generates a `udwall.conf` file at `/etc/udwall/udwall.conf` based on your *current* active UFW rules. |
 | `sudo udwall --backup` | **Backup**: Manually creates a timestamped backup of `/etc/ufw` and `iptables` rules in `~/.udwall/backups/`. |
 | `sudo udwall --status` | **Check Status**: Displays the current UFW status and active rules (numbered). |
+| `sudo udwall --dip` | **Docker IPs**: List Docker container IPs and port mappings. |
 | `sudo udwall --disable` | **Uninstall**: Removes the Docker-UFW integration, deletes custom chains, and disables UFW. |
 | `sudo udwall --enable -f` | **Initialize**: Sets up the Docker-UFW integration and enables UFW. Run this first. Use `-f` to skip SSH check. |
 | `sudo udwall --apply -f` | **Apply Rules**: Reads `udwall.conf`, backs up current state, and applies the new firewall rules. Use `-f` to skip safety checks. |
