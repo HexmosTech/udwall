@@ -197,23 +197,13 @@ def load_rules_from_file():
     Returns:
     list: The list of rule dictionaries loaded from the configuration file.
     """
-    possible_paths = [
-        os.path.join(os.getcwd(), UDWALL_CONF_FILE),
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), UDWALL_CONF_FILE),
-        UDWALL_SYSTEM_CONF_PATH
-    ]
+    # STRICTLY load from system path only
+    file_path = UDWALL_SYSTEM_CONF_PATH
 
-    file_path = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            file_path = path
-            break
-
-    if not file_path:
+    if not os.path.exists(file_path):
         script_name = os.path.basename(sys.argv[0])
         # Use print to stderr for this specific, user-facing error message
-        print(f"❌ ERROR: udwall.conf not found.", file=sys.stderr)
-        print(f"Searched in: {', '.join(possible_paths)}", file=sys.stderr)
+        print(f"❌ ERROR: udwall.conf not found at {file_path}", file=sys.stderr)
         print(f"ℹ️  INFO: You can create one from your current UFW rules by running `sudo {script_name} --create`", file=sys.stderr)
         sys.exit(1)
 
